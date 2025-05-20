@@ -20,8 +20,14 @@
             margin: 20px auto;
             display: flex;
             justify-content: center;
-            gap: 20px;
             flex-wrap: wrap;
+            gap: 30px;
+        }
+
+        .dropdown-pair {
+            display: flex;
+            align-items: center;
+            gap: 8px;
         }
 
         select {
@@ -49,6 +55,18 @@
             fill: #ff6d00;
         }
 
+        .tooltip {
+            position: absolute;
+            background-color: #333;
+            color: #fff;
+            padding: 6px 10px;
+            border-radius: 4px;
+            font-size: 14px;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
         .axis text {
             fill: #fff3e0;
         }
@@ -64,48 +82,53 @@
 <h1>Vaccination Coverage Over Time</h1>
 
 <div class="dropdowns">
-    <label for="vaccineSelect">Vaccine:</label>
-    <select id="vaccineSelect"></select>
+    <div class="dropdown-pair">
+        <label for="vaccineSelect">Vaccine:</label>
+        <select id="vaccineSelect"></select>
+    </div>
 
-    <label for="doseSelect">Dose:</label>
-    <select id="doseSelect"></select>
+    <div class="dropdown-pair" id="doseContainer" style="display: none;">
+        <label for="doseSelect">Dose:</label>
+        <select id="doseSelect"></select>
+    </div>
 
-    <label for="geoSelect">Geography:</label>
-    <select id="geoSelect"></select>
+    <div class="dropdown-pair">
+        <label for="geoSelect">Geography:</label>
+        <select id="geoSelect"></select>
+    </div>
 </div>
 
 <div class="chart">
     <svg width="800" height="500"></svg>
 </div>
+<div class="tooltip" id="tooltip"></div>
 
 <script>
     d3.csv("Vaccination_Coverage_among_Adolescents__13-17_Years__20250520.csv").then(function(data) {
-        // Clean and format data
         data = data.filter(d => d['Survey Year'] && !isNaN(+d['Survey Year']) && !isNaN(+d['Estimate (%)']));
         data.forEach(d => {
             d['Estimate (%)'] = +d['Estimate (%)'];
             d['Survey Year'] = +d['Survey Year'];
         });
 
-        // Dropdown element references
         const vaccineSelect = d3.select("#vaccineSelect");
         const doseSelect = d3.select("#doseSelect");
         const geoSelect = d3.select("#geoSelect");
+        const doseContainer = d3.select("#doseContainer");
 
-        // Populate dropdowns
+        const svg = d3.select("svg");
+        const margin = {top: 30, right: 30, bottom: 30, left: 100};
+        const width = +svg.attr("width") - margin.left - margin.right;
+        const height = +svg.attr("height") - margin.top - margin.bottom;
+        const g = svg.append("g").attr("transform", `translate(${margin.left},${margin.top})`);
+
+        const tooltip = d3.select("#tooltip");
+
         const vaccines = Array.from(new Set(data.map(d => d['Vaccine/Sample']))).sort();
-        const doses = Array.from(new Set(data.map(d => d['Dose']).filter(d => d))).sort();
         const geographies = Array.from(new Set(data.map(d => d['Geography']))).sort();
 
         vaccineSelect.selectAll("option")
             .data(vaccines)
-            .enter()
-            .append("option")
-            .text(d => d)
-            .attr("value", d => d);
-
-        doseSelect.selectAll("option")
-            .data(doses)
             .enter()
             .append("option")
             .text(d => d)
@@ -118,21 +141,37 @@
             .text(d => d)
             .attr("value", d => d);
 
-        const svg = d3.select("svg");
-        const margin = {top: 30, right: 30, bottom: 30, left: 100};
-        const width = +svg.attr("width") - margin.left - margin.right;
-        const height = +svg.attr("height") - margin.top - margin.bottom;
-        const g = svg.append("g").attr("transform", `translate(${margin.left},${margin.top})`);
+        function updateDoseDropdown(selectedVaccine) {
+            const doseOptions = Array.from(
+                new Set(data
+                    .filter(d => d['Vaccine/Sample'] === selectedVaccine && d['Dose'])
+                    .map(d => d['Dose']))
+            ).sort();
+
+            doseSelect.selectAll("option").remove();
+
+            if (doseOptions.length > 0) {
+                doseContainer.style("display", "flex");
+                doseSelect.selectAll("option")
+                    .data(doseOptions)
+                    .enter()
+                    .append("option")
+                    .text(d => d)
+                    .attr("value", d => d);
+            } else {
+                doseContainer.style("display", "none");
+            }
+        }
 
         function updateChart() {
             const selectedVaccine = vaccineSelect.node().value;
-            const selectedDose = doseSelect.node().value;
             const selectedGeo = geoSelect.node().value;
+            const selectedDose = doseContainer.style("display") !== "none" ? doseSelect.node().value : null;
 
             const filteredData = data.filter(d =>
                 d['Vaccine/Sample'] === selectedVaccine &&
-                d['Dose'] === selectedDose &&
-                d['Geography'] === selectedGeo
+                d['Geography'] === selectedGeo &&
+                (selectedDose ? d['Dose'] === selectedDose : true)
             );
 
             const nested = d3.rollup(filteredData, v => d3.mean(v, d => d['Estimate (%)']), d => d['Survey Year']);
@@ -167,13 +206,33 @@
                 .attr("y", d => y(d.year))
                 .attr("x", 0)
                 .attr("height", y.bandwidth())
-                .attr("width", d => x(d.estimate));
+                .attr("width", d => x(d.estimate))
+                .on("mouseover", function(event, d) {
+                    tooltip.transition().style("opacity", 1);
+                    tooltip.html(`Year: ${d.year}<br>Coverage: ${d.estimate.toFixed(1)}%`)
+                        .style("left", (event.pageX + 10) + "px")
+                        .style("top", (event.pageY - 28) + "px");
+                })
+                .on("mousemove", function(event) {
+                    tooltip.style("left", (event.pageX + 10) + "px")
+                           .style("top", (event.pageY - 28) + "px");
+                })
+                .on("mouseout", function() {
+                    tooltip.transition().style("opacity", 0);
+                });
         }
 
-        updateChart();
-        vaccineSelect.on("change", updateChart);
+        vaccineSelect.on("change", function() {
+            updateDoseDropdown(this.value);
+            updateChart();
+        });
+
         doseSelect.on("change", updateChart);
         geoSelect.on("change", updateChart);
+
+        // Initial load
+        updateDoseDropdown(vaccineSelect.node().value);
+        updateChart();
     });
 </script>
 
