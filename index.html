@@ -6,34 +6,56 @@
     <script src="https://d3js.org/d3.v7.min.js"></script>
     <style>
         body {
-            background-color: #0a1a3a;
-            color: #f8f4f0;
+            background-color: #2f1b0c;
+            color: #fff3e0;
             font-family: Arial, sans-serif;
+            text-align: center;
         }
 
         h1 {
-            margin-left: 40px;
+            margin-top: 20px;
         }
 
         .dropdowns {
-            margin: 20px 40px;
+            margin: 20px auto;
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+
+        select {
+            padding: 10px;
+            border: none;
+            border-radius: 10px;
+            background-color: #ffab40;
+            color: #2f1b0c;
+            font-size: 16px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            transition: background-color 0.3s;
+        }
+
+        select:hover {
+            background-color: #ff9100;
         }
 
         .chart {
-            margin-left: 40px;
+            display: flex;
+            justify-content: center;
+            margin-top: 30px;
         }
 
         .bar {
-            fill: #f145a4;
+            fill: #ff6d00;
         }
 
         .axis text {
-            fill: white;
+            fill: #fff3e0;
         }
 
         .axis path,
         .axis line {
-            stroke: white;
+            stroke: #fff3e0;
         }
     </style>
 </head>
@@ -41,7 +63,6 @@
 
 <h1>Vaccination Coverage Over Time</h1>
 
-<!-- Dropdowns for selecting vaccine and geography -->
 <div class="dropdowns">
     <label for="vaccineSelect">Vaccine:</label>
     <select id="vaccineSelect"></select>
@@ -50,32 +71,26 @@
     <select id="geoSelect"></select>
 </div>
 
-<!-- SVG container for D3 chart -->
 <div class="chart">
     <svg width="800" height="500"></svg>
 </div>
 
 <script>
-    // Load data
     d3.csv("Vaccination_Coverage_among_Adolescents__13-17_Years__20250520.csv").then(function(data) {
-        // Parse and clean the data
         data.forEach(d => {
             d['Estimate (%)'] = +d['Estimate (%)'];
             d['Survey Year'] = +d['Survey Year'];
         });
 
-        // Set up SVG and dimensions
         const svg = d3.select("svg");
-        const margin = {top: 40, right: 30, bottom: 50, left: 60};
+        const margin = {top: 30, right: 30, bottom: 30, left: 100};
         const width = +svg.attr("width") - margin.left - margin.right;
         const height = +svg.attr("height") - margin.top - margin.bottom;
         const g = svg.append("g").attr("transform", `translate(${margin.left},${margin.top})`);
 
-        // Extract unique values for dropdowns
         const vaccines = Array.from(new Set(data.map(d => d['Vaccine/Sample']))).sort();
         const geographies = Array.from(new Set(data.map(d => d['Geography']))).sort();
 
-        // Populate vaccine dropdown
         const vaccineSelect = d3.select("#vaccineSelect");
         vaccineSelect.selectAll("option")
             .data(vaccines)
@@ -84,7 +99,6 @@
             .text(d => d)
             .attr("value", d => d);
 
-        // Populate geography dropdown
         const geoSelect = d3.select("#geoSelect");
         geoSelect.selectAll("option")
             .data(geographies)
@@ -93,7 +107,6 @@
             .text(d => d)
             .attr("value", d => d);
 
-        // Function to update chart based on selections
         function updateChart() {
             const selectedVaccine = vaccineSelect.node().value;
             const selectedGeo = geoSelect.node().value;
@@ -101,51 +114,42 @@
             const filteredData = data.filter(d =>
                 d['Vaccine/Sample'] === selectedVaccine && d['Geography'] === selectedGeo);
 
-            // Group by year, taking average if multiple entries
             const nested = d3.rollup(filteredData, v => d3.mean(v, d => d['Estimate (%)']), d => d['Survey Year']);
             const years = Array.from(nested.keys()).sort((a, b) => a - b);
             const estimates = years.map(year => ({year, estimate: nested.get(year)}));
 
-            // Clear previous elements
             g.selectAll("*").remove();
 
-            // Set scales
-            const x = d3.scaleBand()
+            const y = d3.scaleBand()
                 .domain(years)
-                .range([0, width])
+                .range([0, height])
                 .padding(0.2);
 
-            const y = d3.scaleLinear()
+            const x = d3.scaleLinear()
                 .domain([0, d3.max(estimates, d => d.estimate) || 100])
-                .range([height, 0]);
+                .range([0, width]);
 
-            // X axis
+            g.append("g")
+                .attr("class", "axis")
+                .call(d3.axisLeft(y).tickFormat(d3.format("d")));
+
             g.append("g")
                 .attr("transform", `translate(0,${height})`)
                 .attr("class", "axis")
-                .call(d3.axisBottom(x).tickFormat(d3.format("d")));
+                .call(d3.axisBottom(x).ticks(10).tickFormat(d => d + "%"));
 
-            // Y axis
-            g.append("g")
-                .attr("class", "axis")
-                .call(d3.axisLeft(y).ticks(10).tickFormat(d => d + "%"));
-
-            // Bars
             g.selectAll(".bar")
                 .data(estimates)
                 .enter()
                 .append("rect")
                 .attr("class", "bar")
-                .attr("x", d => x(d.year))
-                .attr("y", d => y(d.estimate))
-                .attr("width", x.bandwidth())
-                .attr("height", d => height - y(d.estimate));
+                .attr("y", d => y(d.year))
+                .attr("x", 0)
+                .attr("height", y.bandwidth())
+                .attr("width", d => x(d.estimate));
         }
 
-        // Initial chart
         updateChart();
-
-        // Event listeners
         vaccineSelect.on("change", updateChart);
         geoSelect.on("change", updateChart);
     });
