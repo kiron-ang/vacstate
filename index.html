@@ -4,12 +4,8 @@
     <meta charset="UTF-8">
     <title>Vacstate: Vaccination Coverage in U.S. States | Website by Kiron Ang</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-    <!-- Inline Orange Square Favicon -->
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='100' height='100'><rect width='100' height='100' fill='%23ff6d00'/></svg>">
-
     <script src="https://d3js.org/d3.v7.min.js"></script>
-
     <style>
         body {
             background-color: #2f1b0c;
@@ -18,11 +14,9 @@
             margin: 0;
             text-align: center;
         }
-
         h1 {
             margin: 20px 0 10px;
         }
-
         .dropdowns {
             display: flex;
             flex-wrap: wrap;
@@ -30,13 +24,11 @@
             gap: 20px;
             margin-bottom: 20px;
         }
-
         .dropdown-pair {
             display: flex;
             align-items: center;
             gap: 8px;
         }
-
         select {
             padding: 10px;
             border: none;
@@ -46,27 +38,22 @@
             font-size: 16px;
             box-shadow: 0 4px 6px rgba(0,0,0,0.1);
         }
-
         select:hover {
             background-color: #ff9100;
         }
-
         .chart {
             display: flex;
             justify-content: center;
             margin: auto;
         }
-
         svg {
             width: 90%;
             height: auto;
             max-width: 1000px;
         }
-
         .bar {
             fill: #ff6d00;
         }
-
         .tooltip {
             position: absolute;
             background-color: #333;
@@ -78,63 +65,50 @@
             opacity: 0;
             transition: opacity 0.3s ease;
         }
-
         .axis text {
             fill: #fff3e0;
             font-size: 16px;
         }
-
         .axis path,
         .axis line {
             stroke: #fff3e0;
         }
-
         .source-link {
             margin-top: 20px;
             font-size: 14px;
         }
-
         .source-link a {
             color: #ffab40;
             text-decoration: none;
         }
-
         .source-link a:hover {
             text-decoration: underline;
         }
     </style>
 </head>
 <body>
-
 <h1>Vacstate: Vaccination Coverage in U.S. States</h1>
-
 <div class="dropdowns">
     <div class="dropdown-pair">
         <label for="vaccineSelect">Vaccine:</label>
         <select id="vaccineSelect"></select>
     </div>
-
     <div class="dropdown-pair" id="doseContainer" style="display: none;">
         <label for="doseSelect">Dose:</label>
         <select id="doseSelect"></select>
     </div>
-
     <div class="dropdown-pair">
         <label for="geoSelect">Geography:</label>
         <select id="geoSelect"></select>
     </div>
 </div>
-
 <div class="chart">
     <svg viewBox="0 0 800 500" preserveAspectRatio="xMidYMid meet"></svg>
 </div>
-
 <div class="tooltip" id="tooltip"></div>
-
 <div class="source-link">
     Data Source: <a href="https://data.cdc.gov/Teen-Vaccinations/Vaccination-Coverage-among-Adolescents-13-17-Years/ee48-w5t6" target="_blank">CDC Teen Vaccinations Dataset</a>
 </div>
-
 <script>
     d3.csv("Vaccination_Coverage_among_Adolescents__13-17_Years__20250520.csv").then(function(data) {
         data = data.filter(d => d['Survey Year'] && !isNaN(+d['Survey Year']) && !isNaN(+d['Estimate (%)']));
@@ -142,37 +116,32 @@
             d['Estimate (%)'] = +d['Estimate (%)'];
             d['Survey Year'] = +d['Survey Year'];
         });
-
         const vaccineSelect = d3.select("#vaccineSelect");
         const doseSelect = d3.select("#doseSelect");
         const geoSelect = d3.select("#geoSelect");
         const doseContainer = d3.select("#doseContainer");
-
         const svg = d3.select("svg");
         const margin = {top: 40, right: 30, bottom: 40, left: 100};
         const width = 800 - margin.left - margin.right;
         const height = 500 - margin.top - margin.bottom;
         const g = svg.append("g").attr("transform", `translate(${margin.left},${margin.top})`);
-
         const tooltip = d3.select("#tooltip");
-
         const vaccines = Array.from(new Set(data.map(d => d['Vaccine/Sample']))).sort();
-        const geographies = Array.from(new Set(data.map(d => d['Geography']))).sort();
-
+        const geographies = Array.from(new Set(data.map(d => d['Geography'])))
+            .filter(g => !/[-\d]/.test(g))
+            .sort();
         vaccineSelect.selectAll("option")
             .data(vaccines)
             .enter()
             .append("option")
             .text(d => d)
             .attr("value", d => d);
-
         geoSelect.selectAll("option")
             .data(geographies)
             .enter()
             .append("option")
             .text(d => d)
             .attr("value", d => d);
-
         function updateDoseDropdown(selectedVaccine) {
             const filtered = data.filter(d =>
                 d['Vaccine/Sample'] === selectedVaccine &&
@@ -180,19 +149,15 @@
                 !d['Dose'].toLowerCase().includes('series completion') &&
                 !d['Dose'].toLowerCase().includes('history of disease')
             );
-
             const grouped = d3.rollup(filtered,
                 v => new Set(v.map(d => d['Survey Year'])).size,
                 d => d['Dose']
             );
-
             const doseOptions = Array.from(grouped.entries())
                 .filter(([dose, yearCount]) => yearCount >= 2)
                 .map(([dose]) => dose)
                 .sort();
-
             doseSelect.selectAll("option").remove();
-
             if (doseOptions.length > 0) {
                 doseContainer.style("display", "flex");
                 doseSelect.selectAll("option")
@@ -205,42 +170,33 @@
                 doseContainer.style("display", "none");
             }
         }
-
         function updateChart() {
             const selectedVaccine = vaccineSelect.node().value;
             const selectedGeo = geoSelect.node().value;
             const selectedDose = doseContainer.style("display") !== "none" ? doseSelect.node().value : null;
-
             const filteredData = data.filter(d =>
                 d['Vaccine/Sample'] === selectedVaccine &&
                 d['Geography'] === selectedGeo &&
                 (selectedDose ? d['Dose'] === selectedDose : true)
             );
-
             const nested = d3.rollup(filteredData, v => d3.mean(v, d => d['Estimate (%)']), d => d['Survey Year']);
             const years = Array.from(nested.keys()).filter(y => !isNaN(y)).sort((a, b) => a - b);
             const estimates = years.map(year => ({ year, estimate: nested.get(year) }));
-
             g.selectAll("*").remove();
-
             const y = d3.scaleBand()
                 .domain(years)
                 .range([0, height])
                 .padding(0.2);
-
             const x = d3.scaleLinear()
                 .domain([0, d3.max(estimates, d => d.estimate) || 100])
                 .range([0, width]);
-
             g.append("g")
                 .attr("class", "axis")
                 .call(d3.axisLeft(y).tickFormat(d3.format("d")));
-
             g.append("g")
                 .attr("transform", `translate(0,${height})`)
                 .attr("class", "axis")
                 .call(d3.axisBottom(x).ticks(10).tickFormat(d => d + "%"));
-
             g.selectAll(".bar")
                 .data(estimates)
                 .enter()
@@ -264,20 +220,15 @@
                     tooltip.transition().style("opacity", 0);
                 });
         }
-
         vaccineSelect.on("change", function() {
             updateDoseDropdown(this.value);
             updateChart();
         });
-
         doseSelect.on("change", updateChart);
         geoSelect.on("change", updateChart);
-
-        // Initial load
         updateDoseDropdown(vaccineSelect.node().value);
         updateChart();
     });
 </script>
-
 </body>
 </html>
