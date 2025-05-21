@@ -91,16 +91,16 @@
 
     <div class="dropdowns">
         <div class="dropdown-pair">
+            <label for="geoSelect">State/Territory:</label>
+            <select id="geoSelect"></select>
+        </div>
+        <div class="dropdown-pair">
             <label for="vaccineSelect">Vaccine:</label>
             <select id="vaccineSelect"></select>
         </div>
         <div class="dropdown-pair" id="doseContainer" style="display: none;">
             <label for="doseSelect">Dose:</label>
             <select id="doseSelect"></select>
-        </div>
-        <div class="dropdown-pair">
-            <label for="geoSelect">State/Territory:</label>
-            <select id="geoSelect"></select>
         </div>
     </div>
 
@@ -129,43 +129,43 @@
 
             // Clean and parse data
             const data = rawData
-                .filter(d =>
-                    d["Survey Year"] && d["Estimate (%)"] &&
-                    d["Vaccine/Sample"] && d["Geography"] &&
-                    !isNaN(+d["Survey Year"]) && !isNaN(+d["Estimate (%)"])
-                )
-                .map(d => ({
-                    year: +d["Survey Year"],
-                    estimate: +d["Estimate (%)"],
-                    vaccine: d["Vaccine/Sample"],
-                    dose: d["Dose"] || null,
-                    geography: d["Geography"]
-                }));
+            .filter(d =>
+            d["Survey Year"] && d["Estimate (%)"] &&
+            d["Vaccine/Sample"] && d["Geography"] &&
+            !isNaN(+d["Survey Year"]) && !isNaN(+d["Estimate (%)"])
+            )
+            .map(d => ({
+                year: +d["Survey Year"],
+                estimate: +d["Estimate (%)"],
+                vaccine: d["Vaccine/Sample"],
+                dose: d["Dose"] || null,
+                geography: d["Geography"]
+            }));
 
             const vaccines = [...new Set(data.map(d => d.vaccine))].sort();
             const geographies = [...new Set(data.map(d => d.geography))].filter(g => !/[-\d]/.test(g)).sort();
 
             vaccineSelect.selectAll("option").data(vaccines).enter()
-                .append("option").text(d => d).attr("value", d => d);
+            .append("option").text(d => d).attr("value", d => d);
 
             geoSelect.selectAll("option").data(geographies).enter()
-                .append("option").text(d => d).attr("value", d => d);
+            .append("option").text(d => d).attr("value", d => d);
 
             function updateDoseDropdown(vaccine) {
                 const doses = data.filter(d => d.vaccine === vaccine && d.dose &&
-                    !/series completion|history of disease/i.test(d.dose));
+                !/series completion|history of disease/i.test(d.dose));
 
                 const doseCounts = d3.rollup(doses, v => new Set(v.map(d => d.year)).size, d => d.dose);
                 const validDoses = Array.from(doseCounts.entries())
-                    .filter(([_, count]) => count >= 2)
-                    .map(([dose]) => dose)
-                    .sort();
+                .filter(([_, count]) => count >= 2)
+                .map(([dose]) => dose)
+                .sort();
 
                 doseSelect.selectAll("option").remove();
                 if (validDoses.length > 0) {
                     doseContainer.style("display", "flex");
                     doseSelect.selectAll("option").data(validDoses).enter()
-                        .append("option").text(d => d).attr("value", d => d);
+                    .append("option").text(d => d).attr("value", d => d);
                 } else {
                     doseContainer.style("display", "none");
                 }
@@ -177,9 +177,9 @@
                 const dose = doseContainer.style("display") !== "none" ? doseSelect.property("value") : null;
 
                 const filtered = data.filter(d =>
-                    d.vaccine === vaccine &&
-                    d.geography === geo &&
-                    (!dose || d.dose === dose)
+                d.vaccine === vaccine &&
+                d.geography === geo &&
+                (!dose || d.dose === dose)
                 );
 
                 const nested = d3.rollup(filtered, v => d3.mean(v, d => d.estimate), d => d.year);
@@ -190,12 +190,12 @@
 
                 if (estimates.length === 0) {
                     g.append("text")
-                        .text("No data available for this selection")
-                        .attr("x", width / 2)
-                        .attr("y", height / 2)
-                        .attr("text-anchor", "middle")
-                        .style("fill", "#fff3e0")
-                        .style("font-size", "18px");
+                    .text("No data available for this selection")
+                    .attr("x", width / 2)
+                    .attr("y", height / 2)
+                    .attr("text-anchor", "middle")
+                    .style("fill", "#fff3e0")
+                    .style("font-size", "18px");
                     return;
                 }
 
@@ -204,26 +204,26 @@
 
                 g.append("g").attr("class", "axis").call(d3.axisLeft(y).tickFormat(d3.format("d")));
                 g.append("g").attr("class", "axis").attr("transform", `translate(0,${height})`)
-                    .call(d3.axisBottom(x).ticks(10).tickFormat(d => d + "%"));
+                .call(d3.axisBottom(x).ticks(10).tickFormat(d => d + "%"));
 
                 g.selectAll(".bar").data(estimates).enter()
-                    .append("rect")
-                    .attr("class", "bar")
-                    .attr("y", d => y(d.year))
-                    .attr("x", 0)
-                    .attr("height", y.bandwidth())
-                    .attr("width", d => x(d.estimate))
-                    .on("mouseover", (event, d) => {
-                        tooltip.transition().style("opacity", 1);
-                        tooltip.html(`Year: ${d.year}<br>Coverage: ${d.estimate.toFixed(1)}%`)
-                            .style("left", (event.pageX + 10) + "px")
-                            .style("top", (event.pageY - 28) + "px");
-                    })
-                    .on("mousemove", event => {
-                        tooltip.style("left", (event.pageX + 10) + "px")
-                               .style("top", (event.pageY - 28) + "px");
-                    })
-                    .on("mouseout", () => tooltip.transition().style("opacity", 0));
+                .append("rect")
+                .attr("class", "bar")
+                .attr("y", d => y(d.year))
+                .attr("x", 0)
+                .attr("height", y.bandwidth())
+                .attr("width", d => x(d.estimate))
+                .on("mouseover", (event, d) => {
+                    tooltip.transition().style("opacity", 1);
+                    tooltip.html(`Year: ${d.year}<br>Coverage: ${d.estimate.toFixed(1)}%`)
+                    .style("left", (event.pageX + 10) + "px")
+                    .style("top", (event.pageY - 28) + "px");
+                })
+                .on("mousemove", event => {
+                    tooltip.style("left", (event.pageX + 10) + "px")
+                    .style("top", (event.pageY - 28) + "px");
+                })
+                .on("mouseout", () => tooltip.transition().style("opacity", 0));
             }
 
             vaccineSelect.on("change", function() {
